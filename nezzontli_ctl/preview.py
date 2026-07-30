@@ -111,35 +111,38 @@ def tokenize(text):
 
     matches.sort(key=lambda t: t[0])
 
+    # El 4to campo (o 3ro para "text") es el offset de carácter donde
+    # arranca el segmento en `text` — lo usa EditorScreen para anclar el
+    # scroll del preview a la línea del cursor en el editor.
     segments = []
     cursor = 0
     for start, end, kind, m in matches:
         if start < cursor:
             continue
         if start > cursor:
-            segments.append(("text", text[cursor:start]))
+            segments.append(("text", text[cursor:start], cursor))
 
         if kind == "gallery":
             for qm in _QUOTED_RE.finditer(m.group(1)):
                 path, _, alt = qm.group(1).partition("::")
-                segments.append(("image", path, alt))
+                segments.append(("image", path, alt, start))
         elif kind == "photo":
             kv = _parse_kv_args(m.group(1))
             if "path" in kv:
-                segments.append(("image", kv["path"], kv.get("alt", "")))
+                segments.append(("image", kv["path"], kv.get("alt", ""), start))
         elif kind == "image_shortcode":
             kv = _parse_kv_args(m.group(1))
             if "url" in kv:
-                segments.append(("image", kv["url"], kv.get("alt", "")))
+                segments.append(("image", kv["url"], kv.get("alt", ""), start))
         elif kind == "md_image":
-            segments.append(("image", m.group(2), m.group(1)))
+            segments.append(("image", m.group(2), m.group(1), start))
         elif kind == "display_math":
-            segments.append(("math", m.group(1).strip(), True))
+            segments.append(("math", m.group(1).strip(), True, start))
         elif kind == "inline_math":
-            segments.append(("math", m.group(1).strip(), False))
+            segments.append(("math", m.group(1).strip(), False, start))
 
         cursor = end
 
     if cursor < len(text):
-        segments.append(("text", text[cursor:]))
+        segments.append(("text", text[cursor:], cursor))
     return segments

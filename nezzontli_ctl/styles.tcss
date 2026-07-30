@@ -72,6 +72,12 @@
     margin: 1 0;
 }
 
+.preview-loading {
+    color: $text-muted;
+    text-style: italic;
+    margin: 1 0;
+}
+
 #confirm-diff {
     height: 1fr;
     border: solid $panel;
