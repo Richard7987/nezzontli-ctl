@@ -34,7 +34,14 @@ Validada de punta a punta contra un clone local descartable (no el repo
 real): las 4 pantallas (post, page, album, add-photos), edición con preview
 de Markdown en vivo, commit+push real, y confirmado que las fotos quedan
 como punteros git-lfs reales (no blobs crudos). Pantalla de configuración
-(animal de cowsay, ruta del repo) también probada.
+(animal de cowsay, ruta del repo) también probada. Editar entradas/álbumes
+existentes también probado.
+
+El preview del editor, además de Markdown, renderiza fórmulas LaTeX (subset
+mathtext de matplotlib) como imagen y muestra las imágenes referenciadas
+—locales del repo (`![]()`, shortcodes `photo()`/`gallery()` de Zola) o
+remotas por URL (shortcode `image()`)— usando el protocolo de gráficos de
+la terminal (requiere Kitty, iTerm2 o soporte Sixel; si no, cae a texto).
 
 Todavía no reemplaza a `website/scripts/ctl.py` en el uso diario — eso
 queda a decisión de Ale, una vez que la pruebe él mismo contra el repo real.

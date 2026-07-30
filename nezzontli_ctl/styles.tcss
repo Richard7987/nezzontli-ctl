@@ -49,6 +49,29 @@
     overflow-y: auto;
 }
 
+.preview-image {
+    height: 18;
+    width: auto;
+    margin: 1 0;
+}
+
+.preview-math {
+    height: 3;
+    width: auto;
+    margin: 1 0;
+}
+
+.preview-caption {
+    color: $text-muted;
+    text-style: italic;
+    margin: 0 0 1 0;
+}
+
+.preview-fallback {
+    color: $warning;
+    margin: 1 0;
+}
+
 #confirm-diff {
     height: 1fr;
     border: solid $panel;
