@@ -4,10 +4,21 @@ Migrado tal cual del ctl.py anterior (probado ya en esa versión).
 """
 
 import re
+import tomllib
 from datetime import date
 from pathlib import Path
 
 from nezzontli_ctl.config import IMAGE_EXTENSIONS
+
+
+def parse_frontmatter(text):
+    """Separa +++ TOML +++ / cuerpo. Devuelve (dict, cuerpo)."""
+    if not text.startswith("+++"):
+        return {}, text
+    _, rest = text.split("+++", 1)
+    raw_toml, body = rest.split("+++", 1)
+    data = tomllib.loads(raw_toml)
+    return data, body.lstrip("\n")
 
 
 def slugify(text):
@@ -24,13 +35,23 @@ def toml_list(values):
     return "[" + ", ".join(toml_str(v) for v in values) + "]"
 
 
+def _toml_date(dt):
+    """dt puede ser un date (lo normal) o un string (si el archivo original
+    tenía la fecha entre comillas — Zola la acepta igual, pero tomllib la
+    parsea como string, no como date)."""
+    if dt is None:
+        dt = date.today()
+    if hasattr(dt, "isoformat"):
+        return dt.isoformat()
+    return toml_str(str(dt))
+
+
 def build_post_frontmatter(title, description, tags, authors, katex=False, comments=None, dt=None):
-    dt = dt or date.today()
     lines = [
         f"title = {toml_str(title)}",
         f"description = {toml_str(description)}",
         f"authors = {toml_list(authors)}",
-        f"date = {dt.isoformat()}",
+        f"date = {_toml_date(dt)}",
     ]
     if tags:
         lines.append("[taxonomies]")
@@ -49,13 +70,12 @@ def build_post_frontmatter(title, description, tags, authors, katex=False, comme
 
 
 def build_page_frontmatter(title, description, tags, authors, related=None, dt=None):
-    dt = dt or date.today()
     lines = [
         'template = "article.html"',
         f"title = {toml_str(title)}",
         f"description = {toml_str(description)}",
         f"authors = {toml_list(authors)}",
-        f"date = {dt.isoformat()}",
+        f"date = {_toml_date(dt)}",
     ]
     if tags:
         lines.append("[taxonomies]")
@@ -67,10 +87,9 @@ def build_page_frontmatter(title, description, tags, authors, related=None, dt=N
 
 
 def build_album_frontmatter(title, description, tags, cover_path, dt=None):
-    dt = dt or date.today()
     lines = [
         f"title = {toml_str(title)}",
-        f"date = {dt.isoformat()}",
+        f"date = {_toml_date(dt)}",
         f"description = {toml_str(description)}",
     ]
     if tags:

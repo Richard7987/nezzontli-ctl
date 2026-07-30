@@ -46,6 +46,7 @@
     width: 1fr;
     height: 100%;
     border: solid $panel;
+    overflow-y: auto;
 }
 
 #confirm-diff {

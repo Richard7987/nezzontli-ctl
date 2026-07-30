@@ -1,4 +1,4 @@
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Markdown, Static, TextArea
 
@@ -19,7 +19,7 @@ class EditorScreen(ModalScreen[str]):
 
     def compose(self):
         with Vertical():
-            yield Static(f" {self._title} — Ctrl+S para guardar, Esc para cancelar", id="editor-title")
+            yield Static(f" {self._title}", id="editor-title")
             with Horizontal(classes="editor-split"):
                 yield TextArea(
                     self._initial_text,
@@ -28,13 +28,24 @@ class EditorScreen(ModalScreen[str]):
                     id="editor-textarea",
                     classes="editor-pane",
                 )
-                yield Markdown(self._initial_text, id="editor-preview", classes="editor-pane")
+                with VerticalScroll(id="editor-preview-scroll", classes="editor-pane"):
+                    yield Markdown(self._initial_text, id="editor-preview")
         yield Footer()
 
     def on_mount(self) -> None:
         text_area = self.query_one("#editor-textarea", TextArea)
         text_area.focus()
         text_area.cursor_location = text_area.document.end
+        self.watch(text_area, "scroll_y", self._sync_preview_scroll)
+
+    def _sync_preview_scroll(self, old_value: float, new_value: float) -> None:
+        text_area = self.query_one("#editor-textarea", TextArea)
+        preview_scroll = self.query_one("#editor-preview-scroll", VerticalScroll)
+        max_ta = text_area.max_scroll_y
+        if not max_ta:
+            return
+        ratio = max(0.0, min(1.0, new_value / max_ta))
+        preview_scroll.scroll_y = ratio * preview_scroll.max_scroll_y
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         preview = self.query_one("#editor-preview", Markdown)
