@@ -44,10 +44,13 @@ class NewPostScreen(Screen):
     def on_mount(self) -> None:
         self.query_one("#comments-fields").display = False
 
+    _last_auto_slug = None
+
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "title-input" and not self._slug_touched:
-            self.query_one("#slug-input", Input).value = content.slugify(event.value)
-        elif event.input.id == "slug-input":
+            self._last_auto_slug = content.slugify(event.value)
+            self.query_one("#slug-input", Input).value = self._last_auto_slug
+        elif event.input.id == "slug-input" and event.value != self._last_auto_slug:
             self._slug_touched = True
 
     def on_switch_changed(self, event: Switch.Changed) -> None:

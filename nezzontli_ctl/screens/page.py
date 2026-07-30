@@ -67,10 +67,13 @@ class NewPageScreen(Screen):
         self.query_one("#related-label").display = False
         related_list.display = False
 
+    _last_auto_slug = None
+
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "title-input" and not self._slug_touched:
-            self.query_one("#slug-input", Input).value = content.slugify(event.value)
-        elif event.input.id == "slug-input":
+            self._last_auto_slug = content.slugify(event.value)
+            self.query_one("#slug-input", Input).value = self._last_auto_slug
+        elif event.input.id == "slug-input" and event.value != self._last_auto_slug:
             self._slug_touched = True
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
