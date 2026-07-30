@@ -9,6 +9,7 @@ dependencies = [
     "cowsay>=6.1",
     "textual-image>=0.8",
     "matplotlib>=3.8",
+    "flatlatex>=0.15",
 ]
 
 [project.scripts]

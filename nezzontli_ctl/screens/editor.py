@@ -110,7 +110,7 @@ class EditorScreen(ModalScreen[str]):
             png_path = await asyncio.to_thread(preview_mod.render_math, tex, is_display)
             if png_path is not None and AutoImage is not None:
                 return [AutoImage(str(png_path), classes="preview-math")]
-            return [Static(f"[$] {tex}", classes="preview-fallback")]
+            return [Static(f"$$ {tex} $$", classes="preview-fallback")]
 
         if kind == "image":
             _, ref, alt, _start = segment
@@ -127,10 +127,11 @@ class EditorScreen(ModalScreen[str]):
 
     async def _rebuild_preview(self, text: str) -> None:
         """Tokeniza `text` y remonta el preview como una mezcla de widgets
-        Markdown (texto normal) e Image (fórmulas LaTeX renderizadas a PNG,
+        Markdown (texto normal, con el LaTeX inline ya aproximado a Unicode
+        en el lugar) e Image (fórmulas en bloque $$...$$ renderizadas a PNG,
         imágenes locales del repo o remotas por URL)."""
         preview_scroll = self.query_one("#editor-preview-scroll", VerticalScroll)
-        segments = await asyncio.to_thread(preview_mod.tokenize, text)
+        display_text, segments = await asyncio.to_thread(preview_mod.tokenize, text)
 
         if any(segment[0] in ("math", "image") for segment in segments):
             await preview_scroll.remove_children()
@@ -145,7 +146,7 @@ class EditorScreen(ModalScreen[str]):
         widgets = []
         anchors = []
         for segment, group in zip(segments, rendered_groups):
-            line = text.count("\n", 0, segment[-1])
+            line = display_text.count("\n", 0, segment[-1])
             for widget in group:
                 widgets.append(widget)
                 anchors.append((line, widget))

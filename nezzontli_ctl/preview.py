@@ -24,9 +24,74 @@ _IMAGE_SHORTCODE_RE = re.compile(r"\{\{\s*image\(([^)]*)\)\s*\}\}")
 _QUOTED_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 _KV_RE = re.compile(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"')
 
+# flatlatex no reconoce estos nombres de función/operador (los deja con la
+# barra literal), así que se pasan a texto plano antes de convertir.
+_FUNC_NAMES = [
+    "varlimsup", "varliminf", "limsup", "liminf", "sinh", "cosh", "tanh",
+    "coth", "arcsin", "arccos", "arctan", "sin", "cos", "tan", "cot", "sec",
+    "csc", "log", "ln", "exp", "lim", "max", "min", "det", "gcd", "sup",
+    "inf", "arg", "mod", "deg", "dim", "hom", "ker",
+]
+_WRAPPER_MACROS = ("text", "mathrm", "textrm", "operatorname")
+
 
 def _parse_kv_args(raw):
     return {m.group(1): m.group(2) for m in _KV_RE.finditer(raw)}
+
+
+def _strip_wrapper_macro(tex, name):
+    pattern = re.compile(r"\\" + name + r"\{([^{}]*)\}")
+    while pattern.search(tex):
+        tex = pattern.sub(r"\1", tex)
+    return tex
+
+
+def _preprocess_for_flatlatex(tex):
+    """flatlatex traduce símbolos/griego/sub-superíndices bastante bien,
+    pero no conoce nombres de función (\\sin, \\log, ...), \\text{}/\\mathrm{}
+    (los deja con la barra literal pegada), ni \\left/\\right ni \\to."""
+    for name in _WRAPPER_MACROS:
+        tex = _strip_wrapper_macro(tex, name)
+    for name in _FUNC_NAMES:
+        tex = re.sub(r"\\" + name + r"(?![a-zA-Z])", name + " ", tex)
+    tex = tex.replace(r"\left", "").replace(r"\right", "")
+    tex = tex.replace(r"\to", "→").replace(r"\gets", "←")
+    tex = tex.replace(r"\{", "{").replace(r"\}", "}")
+    return tex
+
+
+_flatlatex_converter = None
+
+
+def latex_to_unicode(tex):
+    """Aproxima una fórmula LaTeX-ish a texto Unicode plano (griego,
+    sub/superíndices, operadores) para que se pueda mostrar flotando en
+    medio de una oración sin partirla en un bloque de imagen separado.
+    Si no se puede convertir, devuelve la fórmula tal cual (con los \\ )."""
+    global _flatlatex_converter
+    if _flatlatex_converter is None:
+        import flatlatex
+
+        _flatlatex_converter = flatlatex.converter()
+    try:
+        return _flatlatex_converter.convert(_preprocess_for_flatlatex(tex))
+    except Exception:
+        return tex
+
+
+def _substitute_inline_math(text):
+    """Reemplaza cada $...$ inline (fuera de bloques $$...$$, que sí se
+    renderizan como imagen más abajo) por su aproximación Unicode, en el
+    mismo lugar del texto — así la oración sigue siendo un solo párrafo de
+    Markdown en el preview en vez de partirse en texto/imagen/texto/imagen."""
+    display_spans = [(m.start(), m.end()) for m in _DISPLAY_MATH_RE.finditer(text)]
+
+    def replace(m):
+        if any(s <= m.start() < e for s, e in display_spans):
+            return m.group(0)
+        return latex_to_unicode(m.group(1).strip())
+
+    return _INLINE_MATH_RE.sub(replace, text)
 
 
 def _resolve_local_image(path_str):
@@ -103,8 +168,17 @@ def render_math(tex, display=False):
 
 def tokenize(text):
     """Parte `text` en segmentos ordenados:
-    ("text", markdown), ("math", tex, es_display), ("image", ruta_o_url, alt)
+    ("text", markdown, offset), ("math", tex, es_display, offset),
+    ("image", ruta_o_url, alt, offset)
+
+    Devuelve (texto_mostrado, segmentos) — el texto inline $...$ ya viene
+    reemplazado por su aproximación Unicode (ver _substitute_inline_math),
+    así que los offsets son relativos a ESE texto, no al original. Solo
+    $$...$$ (bloque) sigue generando un segmento "math" con imagen — el
+    inline nunca rompe el párrafo en pedazos.
     """
+    text = _substitute_inline_math(text)
+
     matches = []
     for m in _GALLERY_RE.finditer(text):
         matches.append((m.start(), m.end(), "gallery", m))
@@ -117,17 +191,11 @@ def tokenize(text):
     for m in _DISPLAY_MATH_RE.finditer(text):
         matches.append((m.start(), m.end(), "display_math", m))
 
-    display_spans = [(s, e) for s, e, k, _ in matches if k == "display_math"]
-    for m in _INLINE_MATH_RE.finditer(text):
-        if any(s <= m.start() < e for s, e in display_spans):
-            continue
-        matches.append((m.start(), m.end(), "inline_math", m))
-
     matches.sort(key=lambda t: t[0])
 
     # El 4to campo (o 3ro para "text") es el offset de carácter donde
-    # arranca el segmento en `text` — lo usa EditorScreen para anclar el
-    # scroll del preview a la línea del cursor en el editor.
+    # arranca el segmento en el texto devuelto — lo usa EditorScreen para
+    # anclar el scroll del preview a la línea del cursor en el editor.
     segments = []
     cursor = 0
     for start, end, kind, m in matches:
@@ -152,11 +220,9 @@ def tokenize(text):
             segments.append(("image", m.group(2), m.group(1), start))
         elif kind == "display_math":
             segments.append(("math", m.group(1).strip(), True, start))
-        elif kind == "inline_math":
-            segments.append(("math", m.group(1).strip(), False, start))
 
         cursor = end
 
     if cursor < len(text):
         segments.append(("text", text[cursor:], cursor))
-    return segments
+    return text, segments
