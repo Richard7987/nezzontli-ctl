@@ -68,20 +68,34 @@ def resolve_image(path_or_url):
 
 def render_math(tex, display=False):
     """Renderiza una fórmula LaTeX-ish (sintaxis mathtext de matplotlib,
-    subconjunto de LaTeX) a PNG, cacheado por contenido. Devuelve el Path
-    del PNG o None si matplotlib no pudo parsearla."""
-    from matplotlib import mathtext
+    subconjunto de LaTeX) a PNG con fondo transparente, cacheado por
+    contenido. Devuelve el Path del PNG o None si no se pudo parsear.
+
+    No se usa matplotlib.mathtext.math_to_image() porque no expone
+    transparent=True — sin eso, savefig() pinta un fondo blanco sólido que
+    se ve como un cartel pegado en medio del preview oscuro. Se reimplementa
+    su mismo procedimiento (parser + Figure.text + savefig) nada más que
+    con el fondo transparente.
+    """
+    from matplotlib.figure import Figure
+    from matplotlib.mathtext import MathTextParser
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    key = f"{'display' if display else 'inline'}:{tex}"
+    # "v2" invalida el caché de renders viejos con fondo blanco.
+    key = f"v2:{'display' if display else 'inline'}:{tex}"
     digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
     cached = CACHE_DIR / f"math-{digest}.png"
     if cached.is_file():
         return cached
+
+    dpi = 200 if display else 150
+    formula = f"${tex}$"
     try:
-        mathtext.math_to_image(
-            f"${tex}$", str(cached), dpi=200 if display else 150, color="#ebdbb2"
-        )
+        parser = MathTextParser("path")
+        width, height, depth, _, _ = parser.parse(formula, dpi=72)
+        fig = Figure(figsize=(width / 72.0, height / 72.0))
+        fig.text(0, depth / height, formula, color="#ebdbb2")
+        fig.savefig(str(cached), dpi=dpi, format="png", transparent=True)
     except Exception:
         return None
     return cached
