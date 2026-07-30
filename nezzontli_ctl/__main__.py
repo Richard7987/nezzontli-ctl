@@ -1,0 +1,4 @@
+from nezzontli_ctl.app import main
+
+if __name__ == "__main__":
+    main()
