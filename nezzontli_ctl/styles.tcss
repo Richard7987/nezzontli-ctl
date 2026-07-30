@@ -1,0 +1,70 @@
+#menu-container {
+    align: center middle;
+    height: 100%;
+    width: 100%;
+}
+
+#banner {
+    width: auto;
+    color: $accent;
+    text-style: bold;
+    content-align: center middle;
+}
+
+#subtitle {
+    width: auto;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+#menu-options {
+    width: 48;
+    max-height: 12;
+}
+
+.form-container {
+    padding: 1 2;
+    height: 100%;
+}
+
+.form-row {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.form-label {
+    width: 100%;
+    color: $text-muted;
+    text-style: bold;
+}
+
+.editor-split {
+    height: 1fr;
+}
+
+.editor-pane {
+    width: 1fr;
+    height: 100%;
+    border: solid $panel;
+}
+
+#confirm-diff {
+    height: 1fr;
+    border: solid $panel;
+    padding: 1;
+}
+
+#confirm-preview {
+    height: 1fr;
+    border: solid $panel;
+    padding: 1;
+}
+
+#success-container {
+    align: center middle;
+    height: 100%;
+}
+
+#cowsay-output {
+    color: $success;
+}

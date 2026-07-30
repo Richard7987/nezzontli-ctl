@@ -30,6 +30,11 @@ ctl   # ya disponible en cualquier terminal, sin activar nada
 
 ## Estado
 
-En desarrollo — todavía no integrada al flujo real de contenido de
-nezzontli.xyz (eso sigue por `website/scripts/ctl.py`, el CLI simple ya
-probado, hasta que esta versión quede validada).
+Validada de punta a punta contra un clone local descartable (no el repo
+real): las 4 pantallas (post, page, album, add-photos), edición con preview
+de Markdown en vivo, commit+push real, y confirmado que las fotos quedan
+como punteros git-lfs reales (no blobs crudos). Pantalla de configuración
+(animal de cowsay, ruta del repo) también probada.
+
+Todavía no reemplaza a `website/scripts/ctl.py` en el uso diario — eso
+queda a decisión de Ale, una vez que la pruebe él mismo contra el repo real.

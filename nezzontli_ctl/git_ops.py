@@ -22,7 +22,10 @@ def diff_stat_cached():
 
 
 def commit_and_push(message):
-    _git("commit", "-m", message)
+    commit = _git("commit", "-m", message, check=False)
+    if commit.returncode != 0:
+        return False, (commit.stdout or "") + (commit.stderr or "")
+
     push = subprocess.run(
         ["git", "push", "origin", "main"],
         cwd=REPO_ROOT,
