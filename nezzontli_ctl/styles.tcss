@@ -93,8 +93,36 @@
 #success-container {
     align: center middle;
     height: 100%;
+    width: 100%;
 }
 
 #cowsay-output {
     color: $success;
+    width: 100%;
+    content-align: center middle;
+}
+
+ConfirmDeleteScreen {
+    align: center middle;
+}
+
+#delete-dialog {
+    width: 64;
+    height: auto;
+    padding: 1 2;
+    border: solid $error;
+    background: $surface;
+}
+
+#delete-target {
+    margin-bottom: 1;
+}
+
+#delete-message {
+    color: $warning;
+    margin-bottom: 1;
+}
+
+#delete-buttons {
+    height: auto;
 }
