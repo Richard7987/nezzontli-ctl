@@ -56,7 +56,7 @@ class EditorScreen(ModalScreen[str]):
     def on_mount(self) -> None:
         text_area = self.query_one("#editor-textarea", TextArea)
         text_area.focus()
-        text_area.cursor_location = text_area.document.end
+        text_area.cursor_location = (0, 0)
         self.watch(text_area, "scroll_y", self._sync_preview_scroll)
         self.run_worker(
             self._rebuild_preview(self._initial_text), exclusive=True, group="preview"
