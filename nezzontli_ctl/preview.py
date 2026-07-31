@@ -39,6 +39,28 @@ def _parse_kv_args(raw):
     return {m.group(1): m.group(2) for m in _KV_RE.finditer(raw)}
 
 
+def split_paragraphs_with_offsets(chunk):
+    """[(párrafo, offset_en_chunk), ...] separados por 1+ líneas en blanco,
+    salteando los que quedan vacíos. Un tramo largo de texto plano (sin
+    imágenes/fórmulas en el medio) se anclaba como un solo widget gigante
+    para el sync del scroll — recién al llegar a la SIGUIENTE fórmula/
+    imagen (si la había) se volvía a mover el preview. Sin más fórmulas
+    después, se quedaba pegado ahí el resto del documento. Con un anchor
+    por párrafo, el sync tiene puntos de referencia repartidos parejo en
+    todo el texto, no solo donde hay imágenes/fórmulas."""
+    parts = []
+    cursor = 0
+    for m in re.finditer(r"\n{2,}", chunk):
+        para = chunk[cursor:m.start()]
+        if para.strip():
+            parts.append((para, cursor))
+        cursor = m.end()
+    tail = chunk[cursor:]
+    if tail.strip():
+        parts.append((tail, cursor))
+    return parts
+
+
 def _strip_wrapper_macro(tex, name):
     pattern = re.compile(r"\\" + name + r"\{([^{}]*)\}")
     while pattern.search(tex):

@@ -101,41 +101,51 @@ class EditorScreen(ModalScreen[str]):
     def _start_rebuild(self, text: str) -> None:
         self.run_worker(self._rebuild_preview(text), exclusive=True, group="preview")
 
-    async def _render_segment(self, segment) -> list:
-        """Renderiza un segmento a 0+ widgets. Corre en paralelo para todos
+    async def _render_segment(self, segment, display_text: str) -> list:
+        """Renderiza un segmento a [(widget, línea_o_None), ...]. `None`
+        para widgets que no deben ser su propio punto de anclaje del sync
+        (ej. la caption debajo de una imagen). Corre en paralelo para todos
         los segmentos vía asyncio.gather (cada render_math/resolve_image
         pesado va a un hilo aparte, así una fórmula lenta no bloquea a las
         demás ni a la UI)."""
         kind = segment[0]
+
         if kind == "text":
-            _, chunk, _start = segment
-            return [Markdown(chunk)] if chunk.strip() else []
+            _, chunk, start = segment
+            entries = []
+            for para, offset_in_chunk in preview_mod.split_paragraphs_with_offsets(chunk):
+                line = display_text.count("\n", 0, start + offset_in_chunk)
+                entries.append((Markdown(para), line))
+            return entries
 
         if kind == "math":
-            _, tex, is_display, _start = segment
+            _, tex, is_display, start = segment
+            line = display_text.count("\n", 0, start)
             png_path = await asyncio.to_thread(preview_mod.render_math, tex, is_display)
             if png_path is not None and AutoImage is not None:
-                return [AutoImage(str(png_path), classes="preview-math")]
-            return [Static(f"$$ {tex} $$", classes="preview-fallback")]
+                return [(AutoImage(str(png_path), classes="preview-math"), line)]
+            return [(Static(f"$$ {tex} $$", classes="preview-fallback"), line)]
 
         if kind == "image":
-            _, ref, alt, _start = segment
+            _, ref, alt, start = segment
+            line = display_text.count("\n", 0, start)
             img_path = await asyncio.to_thread(preview_mod.resolve_image, ref)
             if img_path is not None and AutoImage is not None:
-                widgets = [AutoImage(str(img_path), classes="preview-image")]
+                entries = [(AutoImage(str(img_path), classes="preview-image"), line)]
             else:
-                widgets = [Static(f"[img no encontrada: {ref}]", classes="preview-fallback")]
+                entries = [(Static(f"[img no encontrada: {ref}]", classes="preview-fallback"), line)]
             if alt:
-                widgets.append(Static(alt, classes="preview-caption"))
-            return widgets
+                entries.append((Static(alt, classes="preview-caption"), None))
+            return entries
 
         return []
 
     async def _rebuild_preview(self, text: str) -> None:
         """Tokeniza `text` y remonta el preview como una mezcla de widgets
         Markdown (texto normal, con el LaTeX inline ya aproximado a Unicode
-        en el lugar) e Image (fórmulas en bloque $$...$$ renderizadas a PNG,
-        imágenes locales del repo o remotas por URL)."""
+        en el lugar, un widget por párrafo) e Image (fórmulas en bloque
+        $$...$$ renderizadas a PNG, imágenes locales del repo o remotas por
+        URL)."""
         preview_scroll = self.query_one("#editor-preview-scroll", VerticalScroll)
         display_text, segments = await asyncio.to_thread(preview_mod.tokenize, text)
 
@@ -146,16 +156,23 @@ class EditorScreen(ModalScreen[str]):
             )
 
         rendered_groups = await asyncio.gather(
-            *(self._render_segment(segment) for segment in segments)
+            *(self._render_segment(segment, display_text) for segment in segments)
         )
 
         widgets = []
         anchors = []
-        for segment, group in zip(segments, rendered_groups):
-            line = display_text.count("\n", 0, segment[-1])
-            for widget in group:
+        last_anchored_line = None
+        for group in rendered_groups:
+            for widget, line in group:
                 widgets.append(widget)
-                anchors.append((line, widget))
+                # Un anchor por línea de origen distinta, apuntando al
+                # PRIMER widget que aparece ahí (ej. la imagen, no su
+                # caption debajo; o la primera foto de una gallery con 20
+                # fotos en la misma línea) — anclar cada widget hacía que
+                # el scroll saltara al ÚLTIMO en vez de al primero.
+                if line is not None and line != last_anchored_line:
+                    anchors.append((line, widget))
+                    last_anchored_line = line
 
         await preview_scroll.remove_children()
         await preview_scroll.mount_all(widgets or [Markdown("")])
