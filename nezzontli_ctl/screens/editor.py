@@ -1,6 +1,7 @@
 import asyncio
 
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.geometry import Offset
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Markdown, Static, TextArea
 
@@ -62,15 +63,20 @@ class EditorScreen(ModalScreen[str]):
         )
 
     def _sync_preview_scroll(self, old_value: float, new_value: float) -> None:
-        """TextArea es un widget de líneas monoespaciadas: scroll_y ES el
-        número de línea de origen que está arriba del viewport (no hace
-        falta convertir a proporción). Con eso buscamos qué widget del
-        preview corresponde a esa línea y lo llevamos al tope — anclado al
-        contenido real, no a una altura proporcional que se desalinea en
-        cuanto hay imágenes/fórmulas de altura fija."""
+        """scroll_y de TextArea está en FILAS VISUALES, no en líneas lógicas
+        del documento — con soft_wrap (el default) una sola línea larga de
+        un párrafo ocupa varias filas visuales. Usar scroll_y directo como
+        "línea" (como se hacía antes) se desalinea cada vez más a medida
+        que el documento tiene párrafos largos arriba. wrapped_document
+        traduce la fila visual de vuelta a la línea lógica real, que es la
+        misma unidad en la que se calcularon los anchors."""
         if not self._preview_anchors:
             return
-        top_line = round(new_value)
+        text_area = self.query_one("#editor-textarea", TextArea)
+        top_row = round(new_value)
+        top_line, _column = text_area.wrapped_document.offset_to_location(
+            Offset(0, top_row)
+        )
         target = self._preview_anchors[0][1]
         for line, widget in self._preview_anchors:
             if line <= top_line:
