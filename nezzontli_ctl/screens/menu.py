@@ -7,12 +7,8 @@ from textual.widgets.option_list import Option
 BANNER = pyfiglet.Figlet(font="small").renderText("nezzontli")
 
 MENU_ITEMS = [
-    ("post", "Nuevo post de blog"),
-    ("page", "Nueva página en un proyecto existente"),
-    ("edit-post", "Editar un post o página existente"),
-    ("album", "Nuevo álbum de fotos"),
-    ("add-photos", "Agregar fotos a un álbum existente"),
-    ("edit-album", "Editar un álbum existente"),
+    ("create", "Crear nuevo…"),
+    ("edit", "Editar existente…"),
     ("settings", "Configuración"),
     ("quit", "Salir"),
 ]
@@ -39,6 +35,40 @@ class MenuScreen(Screen):
 
             self.app.push_screen(SettingsScreen())
             return
+        if key == "create":
+            self.app.push_screen(CreateMenuScreen())
+            return
+        if key == "edit":
+            self.app.push_screen(EditMenuScreen())
+            return
+
+
+CREATE_MENU_ITEMS = [
+    ("post", "Nuevo post de blog"),
+    ("page", "Nueva página en un proyecto existente"),
+    ("album", "Nuevo álbum de fotos"),
+    ("back", "← Volver"),
+]
+
+
+class CreateMenuScreen(Screen):
+    BINDINGS = [("escape", "app.pop_screen", "Volver")]
+
+    def compose(self):
+        with Vertical(id="menu-container"):
+            yield Static(BANNER, id="banner")
+            yield Static("crear nuevo", id="subtitle")
+            yield OptionList(
+                *[Option(label, id=key) for key, label in CREATE_MENU_ITEMS],
+                id="menu-options",
+            )
+        yield Footer()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        key = event.option.id
+        if key == "back":
+            self.app.pop_screen()
+            return
         if key == "post":
             from nezzontli_ctl.screens.post import NewPostScreen
 
@@ -54,6 +84,35 @@ class MenuScreen(Screen):
 
             self.app.push_screen(NewAlbumScreen())
             return
+
+
+EDIT_MENU_ITEMS = [
+    ("edit-post", "Post de blog"),
+    ("edit-page", "Página extra de un proyecto"),
+    ("edit-album", "Álbum de fotos"),
+    ("add-photos", "Agregar fotos a un álbum existente"),
+    ("back", "← Volver"),
+]
+
+
+class EditMenuScreen(Screen):
+    BINDINGS = [("escape", "app.pop_screen", "Volver")]
+
+    def compose(self):
+        with Vertical(id="menu-container"):
+            yield Static(BANNER, id="banner")
+            yield Static("editar existente", id="subtitle")
+            yield OptionList(
+                *[Option(label, id=key) for key, label in EDIT_MENU_ITEMS],
+                id="menu-options",
+            )
+        yield Footer()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        key = event.option.id
+        if key == "back":
+            self.app.pop_screen()
+            return
         if key == "add-photos":
             from nezzontli_ctl.screens.add_photos import AddPhotosScreen
 
@@ -61,6 +120,9 @@ class MenuScreen(Screen):
             return
         if key == "edit-post":
             self.run_worker(self._pick_and_edit_post(), exclusive=True)
+            return
+        if key == "edit-page":
+            self.run_worker(self._pick_and_edit_page(), exclusive=True)
             return
         if key == "edit-album":
             self.run_worker(self._pick_and_edit_album(), exclusive=True)
@@ -79,6 +141,20 @@ class MenuScreen(Screen):
         )
         if chosen is not None:
             self.app.push_screen(NewPostScreen(existing_file=chosen))
+
+    async def _pick_and_edit_page(self) -> None:
+        from nezzontli_ctl.screens.page import NewPageScreen, list_extra_pages
+        from nezzontli_ctl.screens.select_existing import SelectExistingScreen
+
+        items = list_extra_pages()
+        if not items:
+            self.notify("No hay páginas extra todavía.")
+            return
+        chosen = await self.app.push_screen_wait(
+            SelectExistingScreen(items, title="Elegí una página para editar")
+        )
+        if chosen is not None:
+            self.app.push_screen(NewPageScreen(existing_file=chosen))
 
     async def _pick_and_edit_album(self) -> None:
         from nezzontli_ctl.screens.edit_album import EditAlbumScreen, list_albums

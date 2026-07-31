@@ -1,10 +1,13 @@
-from textual.containers import Vertical
+import shutil
+
+from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Input, Label, Static
 
-from nezzontli_ctl import content
-from nezzontli_ctl.config import PHOTOS_DIR
+from nezzontli_ctl import content, git_ops
+from nezzontli_ctl.config import IMAGES_DIR, PHOTOS_DIR
 from nezzontli_ctl.screens.confirm import ConfirmPushScreen
+from nezzontli_ctl.screens.confirm_delete import ConfirmDeleteScreen
 from nezzontli_ctl.screens.editor import EditorScreen
 from nezzontli_ctl.screens.success import SuccessScreen
 
@@ -54,7 +57,9 @@ class EditAlbumScreen(Screen):
                 "Para agregar fotos, usá \"Agregar fotos a un álbum existente\" en el menú.",
                 classes="form-row",
             )
-            yield Button("Guardar cambios →", id="continue-button", variant="primary")
+            with Horizontal(classes="form-row"):
+                yield Button("Guardar cambios →", id="continue-button", variant="primary")
+                yield Button("Eliminar", id="delete-button", variant="error")
 
     def on_mount(self) -> None:
         data, body = content.parse_frontmatter(self._existing_file.read_text(encoding="utf-8"))
@@ -69,6 +74,33 @@ class EditAlbumScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "continue-button":
             self.run_worker(self._continue(), exclusive=True)
+        elif event.button.id == "delete-button":
+            self.run_worker(self._delete(), exclusive=True)
+
+    async def _delete(self) -> None:
+        album_dir = self._existing_file.parent
+        slug = album_dir.name
+        title = self.query_one("#title-input", Input).value.strip() or slug
+        images_dir = IMAGES_DIR / slug
+        confirmed = await self.app.push_screen_wait(
+            ConfirmDeleteScreen(
+                f'el álbum "{title}" (content/photos/{slug}/ y static/images/{slug}/, fotos incluidas)'
+            )
+        )
+        if not confirmed:
+            return
+        shutil.rmtree(album_dir)
+        paths = [album_dir]
+        if images_dir.is_dir():
+            shutil.rmtree(images_dir)
+            paths.append(images_dir)
+        git_ops.stage(paths)
+        ok, output = git_ops.commit_and_push(f'Elimina álbum: "{title}"')
+        if not ok:
+            self.query_one("#album-error", Static).update(f"[red]Error al pushear:[/red]\n{output}")
+            return
+        await self.app.push_screen_wait(SuccessScreen("¡Eliminado!"))
+        self.app.pop_screen()
 
     async def _continue(self) -> None:
         error = self.query_one("#album-error", Static)

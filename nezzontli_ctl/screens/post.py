@@ -1,10 +1,13 @@
+import shutil
+
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Input, Label, Static, Switch
 
-from nezzontli_ctl import content
+from nezzontli_ctl import content, git_ops
 from nezzontli_ctl.config import BLOG_DIR
 from nezzontli_ctl.screens.confirm import ConfirmPushScreen
+from nezzontli_ctl.screens.confirm_delete import ConfirmDeleteScreen
 from nezzontli_ctl.screens.editor import EditorScreen
 from nezzontli_ctl.screens.success import SuccessScreen
 
@@ -68,11 +71,14 @@ class NewPostScreen(Screen):
                 yield Input(id="comments-user")
                 yield Label("ID del toot")
                 yield Input(id="comments-id")
-            yield Button(
-                "Guardar cambios →" if editing else "Continuar →",
-                id="continue-button",
-                variant="primary",
-            )
+            with Horizontal(classes="form-row"):
+                yield Button(
+                    "Guardar cambios →" if editing else "Continuar →",
+                    id="continue-button",
+                    variant="primary",
+                )
+                if editing:
+                    yield Button("Eliminar", id="delete-button", variant="error")
 
     def on_mount(self) -> None:
         self.query_one("#comments-fields").display = False
@@ -111,6 +117,25 @@ class NewPostScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "continue-button":
             self.run_worker(self._continue(), exclusive=True)
+        elif event.button.id == "delete-button":
+            self.run_worker(self._delete(), exclusive=True)
+
+    async def _delete(self) -> None:
+        project_dir = self._existing_file.parent
+        title = self.query_one("#title-input", Input).value.strip() or project_dir.name
+        confirmed = await self.app.push_screen_wait(
+            ConfirmDeleteScreen(f'el post "{title}" (content/blog/{project_dir.name}/ completo)')
+        )
+        if not confirmed:
+            return
+        shutil.rmtree(project_dir)
+        git_ops.stage([project_dir])
+        ok, output = git_ops.commit_and_push(f'Elimina post: "{title}"')
+        if not ok:
+            self.query_one("#post-error", Static).update(f"[red]Error al pushear:[/red]\n{output}")
+            return
+        await self.app.push_screen_wait(SuccessScreen("¡Eliminado!"))
+        self.app.pop_screen()
 
     async def _continue(self) -> None:
         editing = self._existing_file is not None
