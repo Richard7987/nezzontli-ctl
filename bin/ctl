@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Wrapper para correr `ctl` desde cualquier lado sin activar `nix develop`
+# a mano cada vez. Por qué existe: la app necesita libstdc++.so.6 (lo pide
+# numpy, dependencia de matplotlib para el renderizado de LaTeX del
+# preview) — en NixOS esa lib solo está en el LD_LIBRARY_PATH que arma el
+# shellHook del flake, así que no alcanza con activar el venv a mano desde
+# afuera de "nix develop".
+#
+# Instalación (una vez):
+#   ln -s ~/projects/nezzontli-ctl/bin/ctl ~/.local/bin/ctl
+#
+# Después, "ctl" desde cualquier lado hace `nix develop` (crea/activa el
+# venv si hace falta, arregla LD_LIBRARY_PATH) y corre la app adentro.
+
+set -euo pipefail
+
+script_path="${BASH_SOURCE[0]}"
+if command -v readlink >/dev/null 2>&1; then
+    script_path="$(readlink -f "$script_path")"
+fi
+repo_dir="$(cd "$(dirname "$script_path")/.." && pwd)"
+
+# El shellHook del flake crea/usa ./.venv relativo al directorio ACTUAL,
+# no al del flake — hay que pararse ahí antes de entrar, si no
+# "pip install -e ." intenta instalar desde donde se invocó "ctl".
+cd "$repo_dir"
+exec nix develop . --command ctl "$@"
