@@ -39,6 +39,25 @@ def _parse_kv_args(raw):
     return {m.group(1): m.group(2) for m in _KV_RE.finditer(raw)}
 
 
+_CODE_FENCE_RE = re.compile(r"```[^\n]*\n.*?\n```", re.DOTALL)
+
+
+def _split_plain_paragraphs(text, base_offset):
+    """[(párrafo, offset_absoluto), ...] separados por 1+ líneas en blanco,
+    salteando los que quedan vacíos."""
+    parts = []
+    cursor = 0
+    for m in re.finditer(r"\n{2,}", text):
+        para = text[cursor:m.start()]
+        if para.strip():
+            parts.append((para, base_offset + cursor))
+        cursor = m.end()
+    tail = text[cursor:]
+    if tail.strip():
+        parts.append((tail, base_offset + cursor))
+    return parts
+
+
 def split_paragraphs_with_offsets(chunk):
     """[(párrafo, offset_en_chunk), ...] separados por 1+ líneas en blanco,
     salteando los que quedan vacíos. Un tramo largo de texto plano (sin
@@ -47,17 +66,20 @@ def split_paragraphs_with_offsets(chunk):
     imagen (si la había) se volvía a mover el preview. Sin más fórmulas
     después, se quedaba pegado ahí el resto del documento. Con un anchor
     por párrafo, el sync tiene puntos de referencia repartidos parejo en
-    todo el texto, no solo donde hay imágenes/fórmulas."""
+    todo el texto, no solo donde hay imágenes/fórmulas.
+
+    Los bloques ```código``` son un párrafo atómico, nunca se parten por
+    las líneas en blanco que tengan adentro (código con espaciado entre
+    funciones/comentarios, típico) — si se parten, cada pedazo reabre su
+    propio widget Markdown con su propio margen y el bloque se ve hecho
+    pedazos con huecos enormes en vez de un solo bloque de código."""
     parts = []
     cursor = 0
-    for m in re.finditer(r"\n{2,}", chunk):
-        para = chunk[cursor:m.start()]
-        if para.strip():
-            parts.append((para, cursor))
+    for m in _CODE_FENCE_RE.finditer(chunk):
+        parts.extend(_split_plain_paragraphs(chunk[cursor:m.start()], cursor))
+        parts.append((m.group(0), m.start()))
         cursor = m.end()
-    tail = chunk[cursor:]
-    if tail.strip():
-        parts.append((tail, cursor))
+    parts.extend(_split_plain_paragraphs(chunk[cursor:], cursor))
     return parts
 
 
