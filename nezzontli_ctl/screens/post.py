@@ -176,7 +176,7 @@ class NewPostScreen(Screen):
             return
 
         frontmatter = content.build_post_frontmatter(
-            title, description, tags, ["B.E. Alejandro"],
+            title, description, tags, ["Ale B. E."],
             katex=katex, comments=comments, dt=self._existing_date,
         )
         if not editing:

@@ -214,7 +214,7 @@ class NewPageScreen(Screen):
             return
 
         frontmatter = content.build_page_frontmatter(
-            title, description, tags, ["B.E. Alejandro"],
+            title, description, tags, ["Ale B. E."],
             related=related, dt=self._existing_date,
         )
         target_file.write_text(frontmatter + "\n" + body, encoding="utf-8")
